@@ -12,15 +12,13 @@ module Data.Graph.Generators.Random.BarabasiAlbert
   )
 where
 
-import           Control.Applicative
-import           Control.Monad
+import           Control.Monad                  ( foldM )
 import           Data.Graph.Generators
 import           Data.IntMultiSet               ( IntMultiSet )
 import qualified Data.IntMultiSet              as IntMultiSet
 import           Data.IntSet                    ( IntSet )
 import qualified Data.IntSet                   as IntSet
 import           Data.List                      ( foldl' )
-import           Debug.Trace
 import           System.Random.MWC
 
 {-|
@@ -135,13 +133,13 @@ barabasiAlbertGraph gen n m = do
     folder :: BarabasiState -> Int -> IO BarabasiState
     folder st curNode = do
       let (repeatedNodes, targets, edges) = st
-          -- Create new edges (for the current node)
+  -- Create new edges (for the current node)
       let newEdges                        = map (\t -> (curNode, t)) targets
-          -- Add nodes to the repeated nodes multiset
+  -- Add nodes to the repeated nodes multiset
       let newRepeatedNodes =
             foldl' (flip IntMultiSet.insert) repeatedNodes targets
       let newRepeatedNodes' = IntMultiSet.insertMany curNode m newRepeatedNodes
-          -- Select the new target set randomly from the repeated nodes
+  -- Select the new target set randomly from the repeated nodes
       let repeatedNodesWithSize =
             (newRepeatedNodes, IntMultiSet.size newRepeatedNodes)
       newTargets <- selectNDistinctRandomElements gen m repeatedNodesWithSize
