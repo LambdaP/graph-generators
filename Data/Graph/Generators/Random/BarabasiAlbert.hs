@@ -13,6 +13,7 @@ module Data.Graph.Generators.Random.BarabasiAlbert
 where
 
 import           Control.Monad                  ( foldM )
+import           Control.Monad.Primitive
 import           Data.Graph.Generators
 import           Data.IntMultiSet               ( IntMultiSet )
 import qualified Data.IntMultiSet              as IntMultiSet
@@ -20,6 +21,8 @@ import           Data.IntSet                    ( IntSet )
 import qualified Data.IntSet                   as IntSet
 import           Data.List                      ( foldl' )
 import           System.Random.MWC
+
+type GenM m = Gen (PrimState m)
 
 {-|
  - Select the nth element
@@ -49,7 +52,7 @@ selectNth n ((a, c) : xs) | n <= c    = a
  - not the number of distinct elements
  - in the multiset.
  -}
-selectRandomElement :: GenIO -> (IntMultiSet, Int) -> IO Int
+selectRandomElement :: (PrimMonad m) => GenM m -> (IntMultiSet, Int) -> m Int
 selectRandomElement gen (ms, msSize) = do
   let msOccurList = IntMultiSet.toOccurList ms
   r <- uniformR (0, msSize - 1) gen
@@ -68,7 +71,8 @@ selectRandomElement gen (ms, msSize) = do
  - a multiset with precomputed size
  - for performance reasons.
  -}
-selectNDistinctRandomElements :: GenIO -> Int -> (IntMultiSet, Int) -> IO [Int]
+selectNDistinctRandomElements
+  :: (PrimMonad m) => GenM m -> Int -> (IntMultiSet, Int) -> m [Int]
 selectNDistinctRandomElements gen n t@(ms, msSize)
   | n == msSize
   = return . map fst . IntMultiSet.toOccurList $ ms
@@ -91,7 +95,7 @@ selectNDistinctRandomElements gen n t@(ms, msSize)
  - until the predefined number of elements are set.
  -}
 selectNDistinctRandomElementsWorker
-  :: GenIO -> Int -> (IntMultiSet, Int) -> IntSet -> IO IntSet
+  :: (PrimMonad m) => GenM m -> Int -> (IntMultiSet, Int) -> IntSet -> m IntSet
 selectNDistinctRandomElementsWorker _ 0 _ current = return current
 selectNDistinctRandomElementsWorker gen n t@(ms, msSize) current = do
   randomElement <- selectRandomElement gen t
@@ -120,26 +124,23 @@ type BarabasiState = (IntMultiSet, [Int], [(Int, Int)])
  - Modeled after NetworkX 1.8.1 barabasi_albert_graph()
  -}
 barabasiAlbertGraph
-  :: GenIO -- ^ The random number generator to use
+  :: (PrimMonad m)
+  => GenM m -- ^ The random number generator to use
   -> Int -- ^ The overall number of nodes (n)
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
-  -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> m GraphInfo -- ^ The resulting graph (IO required for randomness)
 barabasiAlbertGraph gen n m = do
   let nodes     = [0 .. n - 1] -- Nodes [0..m-1]: Initial nodes
      -- (Our state: repeated nodes, current targets, edges)
   let initState = (IntMultiSet.empty, [0 .. m - 1], [])
     -- Strategy: Fold over the list, using a BarabasiState als fold state
   let
-    folder :: BarabasiState -> Int -> IO BarabasiState
     folder st curNode = do
       let (repeatedNodes, targets, edges) = st
-  -- Create new edges (for the current node)
       let newEdges                        = map (\t -> (curNode, t)) targets
-  -- Add nodes to the repeated nodes multiset
       let newRepeatedNodes =
             foldl' (flip IntMultiSet.insert) repeatedNodes targets
       let newRepeatedNodes' = IntMultiSet.insertMany curNode m newRepeatedNodes
-  -- Select the new target set randomly from the repeated nodes
       let repeatedNodesWithSize =
             (newRepeatedNodes, IntMultiSet.size newRepeatedNodes)
       newTargets <- selectNDistinctRandomElements gen m repeatedNodesWithSize
@@ -148,6 +149,9 @@ barabasiAlbertGraph gen n m = do
   (_, _, allEdges) <- foldM folder initState [m .. n - 1]
   return $ GraphInfo n allEdges
 
+-- Create new edges (for the current node)
+-- Add nodes to the repeated nodes multiset
+-- Select the new target set randomly from the repeated nodes
 {-|
  - Like 'barabasiAlbertGraph',
  - but uses a newly initialized random number generator.
