@@ -15,6 +15,9 @@ import qualified System.Random.MWC             as MWC
 
 type Mwc m a = ReaderT (MWC.Gen (PrimState m)) m a
 
+runMwc :: (PrimMonad m) => Mwc m a -> MWC.Gen (PrimState m) -> m a
+runMwc = runReaderT
+
 class Variate a where
   uniform :: (PrimMonad m) => Mwc m a
   uniformR :: (PrimMonad m) => (a, a) -> Mwc m a

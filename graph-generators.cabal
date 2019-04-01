@@ -41,7 +41,7 @@ library
   -- other-extensions:
   build-depends:       base >= 4.2 && < 5.0, containers >= 0.3, mwc-random >= 0.10, fgl >= 5.0,
                        multiset >= 0.2,
-                       primitive, MonadRandom, mtl
+                       primitive, MonadRandom, mtl, monad-loops
   hs-source-dirs: src
   default-language:    Haskell2010
 
@@ -58,7 +58,8 @@ Executable TestGen
                  System.Random.MWC.Monad
   -- other-extensions:
   build-depends:       base >= 4.2.0.1 && < 5.0, directory, containers >= 0.3, mwc-random >= 0.10, fgl >= 5.0,
-                       multiset >= 0.2, primitive, MonadRandom, mtl
+                       multiset >= 0.2, primitive, MonadRandom, mtl,
+                       monad-loops
 
   hs-source-dirs: ., src
   default-language:    Haskell2010
@@ -69,4 +70,4 @@ Test-Suite test-graph-generators
     default-language:    Haskell2010
     build-depends: base, Cabal >= 1.9.2, hspec, hspec-expectations,
                    containers >= 0.3, fgl, QuickCheck, multiset >= 0.2,
-                   mwc-random, primitive, MonadRandom
+                   mwc-random, primitive, MonadRandom, monad-loops

@@ -1,0 +1,8 @@
+Configuring http-conduit-2.3.5...
+Preprocessing library for http-conduit-2.3.5..
+Building library for http-conduit-2.3.5..
+[1 of 3] Compiling Network.HTTP.Client.Conduit ( Network/HTTP/Client/Conduit.hs, .stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/Network/HTTP/Client/Conduit.o )
+[2 of 3] Compiling Network.HTTP.Conduit ( Network/HTTP/Conduit.hs, .stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/Network/HTTP/Conduit.o )
+[3 of 3] Compiling Network.HTTP.Simple ( Network/HTTP/Simple.hs, .stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/Network/HTTP/Simple.o )
+Installing library in /Users/p/.stack/snapshots/x86_64-osx/lts-13.8/8.6.3/lib/x86_64-osx-ghc-8.6.3/http-conduit-2.3.5-9ru3RzBB1t1K4QaVVLF0do
+Registering library for http-conduit-2.3.5..

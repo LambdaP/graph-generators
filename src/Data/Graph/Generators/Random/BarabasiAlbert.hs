@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 {-|
  - Random graph generators using the generator algorithm
  - introduced by A. L. Barabási and R. Albert.
@@ -20,9 +22,10 @@ import qualified Data.IntMultiSet              as IntMultiSet
 import           Data.IntSet                    ( IntSet )
 import qualified Data.IntSet                   as IntSet
 import           Data.List                      ( foldl' )
-import           System.Random.MWC
-
-type GenM m = Gen (PrimState m)
+import           System.Random.MWC              ( asGenIO
+                                                , withSystemRandom
+                                                )
+import           System.Random.MWC.Monad
 
 {-|
  - Select the nth element
@@ -52,10 +55,10 @@ selectNth n ((a, c) : xs) | n <= c    = a
  - not the number of distinct elements
  - in the multiset.
  -}
-selectRandomElement :: (PrimMonad m) => GenM m -> (IntMultiSet, Int) -> m Int
-selectRandomElement gen (ms, msSize) = do
+selectRandomElement :: (PrimMonad m) => (IntMultiSet, Int) -> Mwc m Int
+selectRandomElement (ms, msSize) = do
   let msOccurList = IntMultiSet.toOccurList ms
-  r <- uniformR (0, msSize - 1) gen
+  r <- uniformR (0, msSize - 1)
   return $ selectNth r msOccurList
 
 {-|
@@ -72,14 +75,14 @@ selectRandomElement gen (ms, msSize) = do
  - for performance reasons.
  -}
 selectNDistinctRandomElements
-  :: (PrimMonad m) => GenM m -> Int -> (IntMultiSet, Int) -> m [Int]
-selectNDistinctRandomElements gen n t@(ms, msSize)
+  :: (PrimMonad m) => Int -> (IntMultiSet, Int) -> Mwc m [Int]
+selectNDistinctRandomElements n t@(ms, msSize)
   | n == msSize
   = return . map fst . IntMultiSet.toOccurList $ ms
   | msSize < n
   = error "Can't select n elements from a set with less than n elements"
   | otherwise
-  = IntSet.toList <$> selectNDistinctRandomElementsWorker gen n t IntSet.empty
+  = IntSet.toList <$> selectNDistinctRandomElementsWorker n t IntSet.empty
 
 {-|
  - Internal recursive worker for selectNDistinctRandomElements
@@ -95,14 +98,14 @@ selectNDistinctRandomElements gen n t@(ms, msSize)
  - until the predefined number of elements are set.
  -}
 selectNDistinctRandomElementsWorker
-  :: (PrimMonad m) => GenM m -> Int -> (IntMultiSet, Int) -> IntSet -> m IntSet
-selectNDistinctRandomElementsWorker _ 0 _ current = return current
-selectNDistinctRandomElementsWorker gen n t@(ms, msSize) current = do
-  randomElement <- selectRandomElement gen t
+  :: (PrimMonad m) => Int -> (IntMultiSet, Int) -> IntSet -> Mwc m IntSet
+selectNDistinctRandomElementsWorker 0 _              current = return current
+selectNDistinctRandomElementsWorker n t@(ms, msSize) current = do
+  randomElement <- selectRandomElement t
   let currentWithRE = IntSet.insert randomElement current
   if randomElement `IntSet.member` current
-    then selectNDistinctRandomElementsWorker gen n t current
-    else selectNDistinctRandomElementsWorker gen (n - 1) t currentWithRE
+    then selectNDistinctRandomElementsWorker n t current
+    else selectNDistinctRandomElementsWorker (n - 1) t currentWithRE
 
 {-|
  - Internal fold state for the Barabasi generator.
@@ -125,11 +128,10 @@ type BarabasiState = (IntMultiSet, [Int], [(Int, Int)])
  -}
 barabasiAlbertGraph
   :: (PrimMonad m)
-  => GenM m -- ^ The random number generator to use
-  -> Int -- ^ The overall number of nodes (n)
+  => Int -- ^ The overall number of nodes (n)
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
-  -> m GraphInfo -- ^ The resulting graph (IO required for randomness)
-barabasiAlbertGraph gen n m = do
+  -> Mwc m GraphInfo -- ^ The resulting graph (IO required for randomness)
+barabasiAlbertGraph n m = do
   let nodes     = [0 .. n - 1] -- Nodes [0..m-1]: Initial nodes
      -- (Our state: repeated nodes, current targets, edges)
   let initState = (IntMultiSet.empty, [0 .. m - 1], [])
@@ -143,7 +145,7 @@ barabasiAlbertGraph gen n m = do
       let newRepeatedNodes' = IntMultiSet.insertMany curNode m newRepeatedNodes
       let repeatedNodesWithSize =
             (newRepeatedNodes, IntMultiSet.size newRepeatedNodes)
-      newTargets <- selectNDistinctRandomElements gen m repeatedNodesWithSize
+      newTargets <- selectNDistinctRandomElements m repeatedNodesWithSize
       return (newRepeatedNodes', newTargets, edges ++ newEdges)
     -- From the final state, we only require the edge list
   (_, _, allEdges) <- foldM folder initState [m .. n - 1]
@@ -172,4 +174,4 @@ barabasiAlbertGraph'
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
   -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
 barabasiAlbertGraph' n m =
-  withSystemRandom . asGenIO $ \gen -> barabasiAlbertGraph gen n m
+  withSystemRandom . asGenIO $ \gen -> runMwc (barabasiAlbertGraph n m) gen
