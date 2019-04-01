@@ -35,12 +35,13 @@ library
                    Data.Graph.Generators.Random.ErdosRenyi,
                    Data.Graph.Generators.Random.WattsStrogatz,
                    Data.Graph.Generators.Random.BarabasiAlbert,
-                   Data.Graph.Generators.Random.RandomGeometric
+                   Data.Graph.Generators.Random.RandomGeometric,
+                   System.Random.MWC.Monad
   -- other-modules:
   -- other-extensions:
   build-depends:       base >= 4.2 && < 5.0, containers >= 0.3, mwc-random >= 0.10, fgl >= 5.0,
                        multiset >= 0.2,
-                       primitive, MonadRandom
+                       primitive, MonadRandom, mtl
   hs-source-dirs: src
   default-language:    Haskell2010
 
@@ -53,10 +54,11 @@ Executable TestGen
                  Data.Graph.Generators.Random.ErdosRenyi,
                  Data.Graph.Generators.Random.WattsStrogatz,
                  Data.Graph.Generators.Random.BarabasiAlbert,
-                 Data.Graph.Generators.Random.RandomGeometric
+                 Data.Graph.Generators.Random.RandomGeometric,
+                 System.Random.MWC.Monad
   -- other-extensions:
   build-depends:       base >= 4.2.0.1 && < 5.0, directory, containers >= 0.3, mwc-random >= 0.10, fgl >= 5.0,
-                       multiset >= 0.2, primitive, MonadRandom
+                       multiset >= 0.2, primitive, MonadRandom, mtl
 
   hs-source-dirs: ., src
   default-language:    Haskell2010
