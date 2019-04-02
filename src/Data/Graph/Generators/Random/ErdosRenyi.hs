@@ -21,18 +21,13 @@ module Data.Graph.Generators.Random.ErdosRenyi
   , erdosRenyiGraph'
         -- ** Graph component generators
   , erdosRenyiContext
-        -- ** Utility functions
-  , selectWithProbability
-        -- ** Graph generators
   )
 where
 
-import           Control.Applicative            ( (<$>) )
-import           Control.Monad
 import           Control.Monad.Primitive
 import           Data.Graph.Generators
-import           System.Random.MWC              ( asGenIO
-                                                , withSystemRandom
+import           Data.Graph.Generators.Internal ( randomContext
+                                                , randomFilter
                                                 )
 import           System.Random.MWC.Monad
 
@@ -54,11 +49,7 @@ erdosRenyiContext
                       --   from or to the given node
   -> Double -- ^ The probability for any pair of nodes to be connected
   -> Mwc m GraphContext -- ^ The resulting graph (IO required for randomness)
-erdosRenyiContext n allNodes p = do
-  let endpoints = selectWithProbability p allNodes
-  inEdges  <- endpoints
-  outEdges <- endpoints
-  return $ GraphContext inEdges n outEdges
+erdosRenyiContext = randomContext
 
 {-|
     Generate a unlabelled directed random graph using the Algorithm introduced by
@@ -89,10 +80,10 @@ erdosRenyiGraph
 erdosRenyiGraph n p = do
   let allNodes            = [0 .. n - 1]
     -- Outgoing edge targets for any node
-  let outgoingEdgeTargets = selectWithProbability p allNodes
+  let outgoingEdgeTargets = randomFilter p allNodes
     -- Outgoing edge tuples for a single nodes
-  let singleNodeEdges node = zip (repeat node) <$> outgoingEdgeTargets
-  allEdges <- concat <$> mapM singleNodeEdges allNodes
+  let singleNodeEdges node = fmap (zip (repeat node)) outgoingEdgeTargets
+  allEdges <- fmap concat (mapM singleNodeEdges allNodes)
   return $ GraphInfo n allEdges
 
 {-|
@@ -112,22 +103,4 @@ erdosRenyiGraph'
   :: Int -- ^ The number of nodes
   -> Double -- ^ The probability for any pair of nodes to be connected
   -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
-erdosRenyiGraph' n p =
-  withSystemRandom . asGenIO $ \gen -> runMwc (erdosRenyiGraph n p) gen
-
-{-|
-    Filter a list by selecting each list element
-    uniformly with a given probability p
-
-    Although this is mainly used internally, it can be used as general utility function
--}
-selectWithProbability
-  :: (PrimMonad m)
-  => Double -- ^ The probability to select each list element
-  -> [a] -- ^ The list to filter
-  -> Mwc m [a] -- ^ The filtered list
-selectWithProbability _ []       = return []
-selectWithProbability p (x : xs) = do
-  r <- uniform
-  let v = [ x | r <= p ]
-  liftM2 (++) (return v) $ selectWithProbability p xs
+erdosRenyiGraph' n p = runMwcWithSystemRandom (erdosRenyiGraph n p)

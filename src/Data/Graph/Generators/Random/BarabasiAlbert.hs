@@ -22,9 +22,6 @@ import qualified Data.IntMultiSet              as IntMultiSet
 import           Data.IntSet                    ( IntSet )
 import qualified Data.IntSet                   as IntSet
 import           Data.List                      ( foldl' )
-import           System.Random.MWC              ( asGenIO
-                                                , withSystemRandom
-                                                )
 import           System.Random.MWC.Monad
 
 {-|
@@ -165,5 +162,4 @@ barabasiAlbertGraph'
   :: Int -- ^ The number of nodes
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
   -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
-barabasiAlbertGraph' n m =
-  withSystemRandom . asGenIO $ \gen -> runMwc (barabasiAlbertGraph n m) gen
+barabasiAlbertGraph' n m = runMwcWithSystemRandom (barabasiAlbertGraph n m)

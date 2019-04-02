@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-|
   Implementations of binomially random graphs, as described by Erdős and Rényi.
 
@@ -21,21 +23,21 @@ module Data.Graph.Generators.Random.WattsStrogatz
   , wattsStrogatzGraph'
         -- ** Graph component generators
   , wattsStrogatzContext
-        -- ** Utility functions
-  , randomFilter
-  -- ** Graph generators
   )
 where
 
-import           Control.Applicative            ( (<$>) )
-import           Control.Monad
+import           Control.Monad                  ( foldM )
 import           Control.Monad.Loops            ( iterateWhile )
+import           Control.Monad.Primitive
 import           Data.Graph.Generators
+import           Data.Graph.Generators.Internal ( randomContext
+                                                , randomFilter
+                                                )
 import           Data.IntMap                    ( IntMap )
 import qualified Data.IntMap                   as Map
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           System.Random.MWC
+import           System.Random.MWC.Monad
 
 type Node = Int
 
@@ -44,7 +46,13 @@ type Edge = (Node, Node)
 type MapGraph = IntMap (Set Node)
 
 {-|
-    Generate a small-world context using the Wattz Strogatz method.
+    Generate a small-world context using the Watts-Strogatz method.
+
+    NOTE: this used to have the exact same code
+    as Data.Graph.Generators.ErdosRenyi.erdosRenyiContext,
+    so the actual code
+    was moved to Data.Graph.Internal
+    after refactorization.
 
     See 'wattsStrogatzGraph' for a detailed algorithm description.
 
@@ -55,15 +63,13 @@ type MapGraph = IntMap (Set Node)
     >
 -}
 wattsStrogatzContext
-  :: GenIO -- ^ The random number generator to use
-  -> Int -- ^ Identifier of the context's central node
+  :: (PrimMonad m)
+  => Int -- ^ Identifier of the context's central node
   -> [Int] -- ^ The algorithm will generate random edges to those nodes
                       --   from or to the given node
   -> Double -- ^ The probability for any pair of nodes to be connected
-  -> IO GraphContext -- ^ The resulting graph (IO required for randomness)
-wattsStrogatzContext gen n allNodes p =
-  (\i -> GraphContext i n) <$> endpoints <*> endpoints
-  where endpoints = randomFilter gen p allNodes
+  -> Mwc m GraphContext -- ^ The resulting graph (IO required for randomness)
+wattsStrogatzContext = randomContext
 
 {-|
     Generate a unlabelled undirected random graph using the Algorithm introduced by
@@ -84,30 +90,31 @@ wattsStrogatzContext gen n allNodes p =
 
 -}
 wattsStrogatzGraph
-  :: GenIO -- ^ The random number generator to use
-  -> Int -- ^ n, The number of nodes
+  :: forall m
+   . (PrimMonad m)
+  => Int -- ^ n, The number of nodes
   -> Int -- ^ k, the size of the neighborhood / degree (should be even)
   -> Double -- ^ \beta, The probability of a forward edge getting rewired
-  -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
-wattsStrogatzGraph gen n k β = do
+  -> Mwc m GraphInfo -- ^ The resulting graph
+wattsStrogatzGraph n k β = do
   let lattice = ringLattice n (k `div` 2)
   rewired <- foldM rewireForwardNeighborhood lattice [0 .. n - 1]
   let allEdges = [ (i, j) | (i, js) <- Map.toList rewired, j <- Set.toList js ]
   return (GraphInfo n allEdges)
  where
-  rewireForwardNeighborhood :: MapGraph -> Node -> IO MapGraph
+  rewireForwardNeighborhood :: MapGraph -> Node -> Mwc m MapGraph
   rewireForwardNeighborhood graph node = do
     let forward = forwardNeighbors n (k `div` 2) node
-    forward' <- randomFilter gen β forward
+    forward' <- randomFilter β forward
     foldM (rewireEdge node) graph forward'
-  rewireEdge :: Node -> MapGraph -> Node -> IO MapGraph
+  rewireEdge :: Node -> MapGraph -> Node -> Mwc m MapGraph
   rewireEdge node graph oldNeighbor = do
     newNeighbor <- randomNonNeighbor node graph
     return
       ((insertEdge (node, newNeighbor) . removeEdge (node, oldNeighbor)) graph)
-  randomNonNeighbor :: Int -> MapGraph -> IO Int
-  randomNonNeighbor node graph =
-    iterateWhile (\j -> node == j || isNeighbor j) $ uniformR (0, n - 1) gen
+  randomNonNeighbor :: Int -> MapGraph -> Mwc m Int
+  randomNonNeighbor node graph = iterateWhile (\j -> node == j || isNeighbor j)
+    $ uniformR (0, n - 1)
     where isNeighbor j = isEdge (node, j) graph || isEdge (j, node) graph
 
 {-|
@@ -131,13 +138,13 @@ isEdge (i, j) graph = case Map.lookup i graph of
 
 removeEdge :: Edge -> MapGraph -> MapGraph
 removeEdge (k, v) graph = case Map.lookup k graph of
-  Nothing -> Map.insert k (Set.empty) graph
   Just ns -> Map.insert k (Set.delete v ns) graph
+  Nothing -> Map.insert k (Set.empty) graph
 
 insertEdge :: Edge -> MapGraph -> MapGraph
 insertEdge (k, v) graph = case Map.lookup k graph of
-  Nothing -> Map.insert k (Set.singleton v) graph
   Just ns -> Map.insert k (Set.insert v ns) graph
+  Nothing -> Map.insert k (Set.singleton v) graph
 
 {-|
     Like 'wattsStrogatzGraph', but uses a newly initialized random number generator.
@@ -157,8 +164,4 @@ wattsStrogatzGraph'
   -> Int -- ^ k, the size of the neighborhood / degree (should be even)
   -> Double -- ^ \beta, The probability of a forward edge getting rewritten
   -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
-wattsStrogatzGraph' n k p =
-  withSystemRandom . asGenIO $ \gen -> wattsStrogatzGraph gen n k p
-
-randomFilter :: GenIO -> Double -> [a] -> IO [a]
-randomFilter gen p = filterM (\_ -> fmap (<= p) (uniform gen))
+wattsStrogatzGraph' n k p = runMwcWithSystemRandom (wattsStrogatzGraph n k p)

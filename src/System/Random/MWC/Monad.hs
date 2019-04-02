@@ -3,7 +3,13 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module System.Random.MWC.Monad where
+module System.Random.MWC.Monad
+  ( Variate(..)
+  , Mwc
+  , runMwc
+  , runMwcWithSystemRandom
+  )
+where
 
 import           Control.Monad.Primitive
 import           Control.Monad.Reader
@@ -13,6 +19,10 @@ type Mwc m a = ReaderT (MWC.Gen (PrimState m)) m a
 
 runMwc :: (PrimMonad m) => Mwc m a -> MWC.Gen (PrimState m) -> m a
 runMwc = runReaderT
+
+runMwcWithSystemRandom :: Mwc IO a -> IO a
+runMwcWithSystemRandom mwc =
+  (MWC.withSystemRandom . MWC.asGenIO) (runReaderT mwc)
 
 class Variate a where
   uniform :: (PrimMonad m) => Mwc m a

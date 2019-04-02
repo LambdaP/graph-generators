@@ -32,6 +32,7 @@ library
                    Data.Graph.Generators.Classic,
                    Data.Graph.Generators.Regular,
                    Data.Graph.Generators.FGL,
+                   Data.Graph.Generators.Internal,
                    Data.Graph.Generators.Random.ErdosRenyi,
                    Data.Graph.Generators.Random.WattsStrogatz,
                    Data.Graph.Generators.Random.BarabasiAlbert,
