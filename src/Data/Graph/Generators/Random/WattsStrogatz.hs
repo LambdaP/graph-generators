@@ -22,7 +22,7 @@ module Data.Graph.Generators.Random.WattsStrogatz
         -- ** Graph component generators
   , wattsStrogatzContext
         -- ** Utility functions
-  , selectWithProbability
+  , randomFilter
   -- ** Graph generators
   )
 where
@@ -31,11 +31,17 @@ import           Control.Applicative            ( (<$>) )
 import           Control.Monad
 import           Control.Monad.Loops            ( iterateWhile )
 import           Data.Graph.Generators
-import qualified Data.Map                      as Map
+import           Data.IntMap                    ( IntMap )
+import qualified Data.IntMap                   as Map
+import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           System.Random.MWC
 
-type MapOfSets = Map.Map Int (Set.Set Int)
+type Node = Int
+
+type Edge = (Node, Node)
+
+type MapGraph = IntMap (Set Node)
 
 {-|
     Generate a small-world context using the Wattz Strogatz method.
@@ -55,11 +61,9 @@ wattsStrogatzContext
                       --   from or to the given node
   -> Double -- ^ The probability for any pair of nodes to be connected
   -> IO GraphContext -- ^ The resulting graph (IO required for randomness)
-wattsStrogatzContext gen n allNodes p = do
-  let endpoints = selectWithProbability gen p allNodes
-  inEdges  <- endpoints
-  outEdges <- endpoints
-  return $ GraphContext inEdges n outEdges
+wattsStrogatzContext gen n allNodes p =
+  (\i -> GraphContext i n) <$> endpoints <*> endpoints
+  where endpoints = randomFilter gen p allNodes
 
 {-|
     Generate a unlabelled undirected random graph using the Algorithm introduced by
@@ -83,54 +87,57 @@ wattsStrogatzGraph
   :: GenIO -- ^ The random number generator to use
   -> Int -- ^ n, The number of nodes
   -> Int -- ^ k, the size of the neighborhood / degree (should be even)
-  -> Double -- ^ \beta, The probability of a forward edge getting rewritten
+  -> Double -- ^ \beta, The probability of a forward edge getting rewired
   -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
-wattsStrogatzGraph gen n k p = do
-  let allNodes = [0 .. n - 1]
-  -- Outgoing edge targets for any node
-  let insert m (i, js) = Map.insert i js m
-  let initialEdges =
-        foldl (insert) (Map.empty) [ (i, forward_neighbors i) | i <- allNodes ]
-  allEdges <- rewrites
-    initialEdges
-    [ (i, j) | (i, s) <- Map.toList initialEdges, j <- Set.toList s ]
-  return $ GraphInfo n (delineate allEdges)
+wattsStrogatzGraph gen n k β = do
+  let lattice = ringLattice n (k `div` 2)
+  rewired <- foldM rewireForwardNeighborhood lattice [0 .. n - 1]
+  let allEdges = [ (i, j) | (i, js) <- Map.toList rewired, j <- Set.toList js ]
+  return (GraphInfo n allEdges)
  where
-  k' = fromInteger . toInteger $ k
-  forward_neighbors :: Int -> Set.Set Int
-  forward_neighbors i =
-    foldr (Set.insert) Set.empty $ fmap (`mod` n) [i + 1 .. i + k']
-  -- TODO : verify this is equivalent to previous version
-  rewrites :: MapOfSets -> [(Int, Int)] -> IO MapOfSets
-  rewrites edges ts = do
-    tuples <- randomFilter gen p ts
-    foldM rewrite edges tuples
-  rewrite :: MapOfSets -> (Int, Int) -> IO MapOfSets
-  rewrite edges (i, j1) =
-    fmap (\j2 -> swap (i, j1) (i, j2) edges)
-      $ iterateWhile
-          (\j2 -> i == j2 || member (i, j2) edges || member (j2, i) edges)
-      $ uniformR (0, n - 1) gen
+  rewireForwardNeighborhood :: MapGraph -> Node -> IO MapGraph
+  rewireForwardNeighborhood graph node = do
+    let forward = forwardNeighbors n (k `div` 2) node
+    forward' <- randomFilter gen β forward
+    foldM (rewireEdge node) graph forward'
+  rewireEdge :: Node -> MapGraph -> Node -> IO MapGraph
+  rewireEdge node graph oldNeighbor = do
+    newNeighbor <- randomNonNeighbor node graph
+    return
+      ((insertEdge (node, newNeighbor) . removeEdge (node, oldNeighbor)) graph)
+  randomNonNeighbor :: Int -> MapGraph -> IO Int
+  randomNonNeighbor node graph =
+    iterateWhile (\j -> node == j || isNeighbor j) $ uniformR (0, n - 1) gen
+    where isNeighbor j = isEdge (node, j) graph || isEdge (j, node) graph
 
-randomFilter :: GenIO -> Double -> [a] -> IO [a]
-randomFilter gen p = filterM (\_ -> fmap (<= p) (uniform gen))
+{-|
+ - Constructs the regular ring lattice
+ - with n nodes
+ - where each node has 2*halfK neighbors.
+ -
+ - The nodes are labeled 0 through n-1.
+ -}
+ringLattice :: Int -> Int -> MapGraph
+ringLattice n halfK = Map.fromList
+  [ (i, Set.fromList (forwardNeighbors n halfK i)) | i <- [0 .. n - 1] ]
 
-delineate :: Map.Map a (Set.Set b) -> [(a, b)]
-delineate m = [ (i, j) | (i, js) <- Map.toList m, j <- Set.toList js ]
+forwardNeighbors :: Int -> Int -> Int -> [Int]
+forwardNeighbors n halfK i = [ (i + j) `mod` n | j <- [1 .. halfK] ]
 
-member :: (Int, Int) -> Map.Map Int (Set.Set Int) -> Bool
-member (i, j) m = Set.member j (Map.findWithDefault Set.empty i m)
+isEdge :: Edge -> MapGraph -> Bool
+isEdge (i, j) graph = case Map.lookup i graph of
+  Just neighbors -> Set.member j neighbors
+  _              -> False
 
-swap
-  :: (Ord a, Ord b)
-  => (a, b)
-  -> (a, b)
-  -> Map.Map a (Set.Set b)
-  -> Map.Map a (Set.Set b)
-swap (k1, v1) (k2, v2) m =
-  let set1 = Map.findWithDefault Set.empty k1 m
-  in  let set2 = Set.insert v2 $ Set.delete v1 set1
-      in  let m2 = Map.insert k2 set2 $ Map.delete k1 m in m2
+removeEdge :: Edge -> MapGraph -> MapGraph
+removeEdge (k, v) graph = case Map.lookup k graph of
+  Nothing -> Map.insert k (Set.empty) graph
+  Just ns -> Map.insert k (Set.delete v ns) graph
+
+insertEdge :: Edge -> MapGraph -> MapGraph
+insertEdge (k, v) graph = case Map.lookup k graph of
+  Nothing -> Map.insert k (Set.singleton v) graph
+  Just ns -> Map.insert k (Set.insert v ns) graph
 
 {-|
     Like 'wattsStrogatzGraph', but uses a newly initialized random number generator.
@@ -153,13 +160,5 @@ wattsStrogatzGraph'
 wattsStrogatzGraph' n k p =
   withSystemRandom . asGenIO $ \gen -> wattsStrogatzGraph gen n k p
 
-selectWithProbability
-  :: GenIO -- ^ The random generator state
-  -> Double -- ^ The probability to select each list element
-  -> [a] -- ^ The list to filter
-  -> IO [a] -- ^ The filtered list
-selectWithProbability _   _ []       = return []
-selectWithProbability gen p (x : xs) = do
-  r <- uniform gen :: IO Double
-  let v = [ x | r <= p ]
-  liftM2 (++) (return v) $ selectWithProbability gen p xs
+randomFilter :: GenIO -> Double -> [a] -> IO [a]
+randomFilter gen p = filterM (\_ -> fmap (<= p) (uniform gen))
