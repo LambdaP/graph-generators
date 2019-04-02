@@ -121,11 +121,11 @@ barabasiAlbertGraph
   :: (PrimMonad m)
   => Int -- ^ The overall number of nodes (n)
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
-  -> Mwc m GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> Mwc m GraphInfo -- ^ The resulting graph
 barabasiAlbertGraph n m = do
-  let initState = (IntMultiSet.empty, [0 .. m - 1], []) -- (Our state: repeated nodes, current targets, edges)
-    -- Strategy: Fold over the list, using a BarabasiState als fold state
   let
+    initState = (IntMultiSet.empty, [0 .. m - 1], []) -- (Our state: repeated nodes, current targets, edges)
+  -- Strategy: Fold over the list, using a BarabasiState als fold state
     folder st curNode = do
       let (repeatedNodes, targets, edges) = st
       let newEdges                        = map (\t -> (curNode, t)) targets
@@ -136,7 +136,7 @@ barabasiAlbertGraph n m = do
             (newRepeatedNodes, IntMultiSet.size newRepeatedNodes)
       newTargets <- selectNDistinctRandomElements m repeatedNodesWithSize
       return (newRepeatedNodes', newTargets, edges ++ newEdges)
-    -- From the final state, we only require the edge list
+      -- From the final state, we only require the edge list
   (_, _, allEdges) <- foldM folder initState [m .. n - 1]
   return $ GraphInfo n allEdges
 
@@ -161,5 +161,5 @@ barabasiAlbertGraph n m = do
 barabasiAlbertGraph'
   :: Int -- ^ The number of nodes
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
-  -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> IO GraphInfo -- ^ The resulting graph
 barabasiAlbertGraph' n m = runMwcWithSystemRandom (barabasiAlbertGraph n m)

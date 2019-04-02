@@ -32,7 +32,7 @@ data GraphInfo = GraphInfo
     it is isomophic to FGL's UContext
 -}
 data GraphContext = GraphContext
-  { graphContextInEdges   :: [Int] -- ^ Nodes having an edge to the current node
+  { graphContextInEdges   :: [Int] -- ^ Nodes having an outgoing edge to the current node
   , graphContextNodeLabel :: Int -- ^ The node identifier of the current node
   , graphContextOutEdges  :: [Int] -- ^ Nodes having an ingoing edge from the current node
   }

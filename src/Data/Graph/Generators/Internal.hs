@@ -15,8 +15,7 @@ randomFilter p = filterM (\_ -> fmap (<= p) uniform)
 randomContext
   :: (PrimMonad m)
   => Int -- ^ Identifier of the context's central node
-  -> [Int] -- ^ The algorithm will generate random edges to those nodes
-                      --   from or to the given node
+  -> [Int] -- ^ Nodes to potentially connect to the central node
   -> Double -- ^ The probability for any pair of nodes to be connected
   -> Mwc m GraphContext -- ^ The resulting graph
 randomContext node allNodes p =

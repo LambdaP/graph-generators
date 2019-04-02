@@ -68,7 +68,7 @@ wattsStrogatzContext
   -> [Int] -- ^ The algorithm will generate random edges to those nodes
                       --   from or to the given node
   -> Double -- ^ The probability for any pair of nodes to be connected
-  -> Mwc m GraphContext -- ^ The resulting graph (IO required for randomness)
+  -> Mwc m GraphContext -- ^ The resulting graph
 wattsStrogatzContext = randomContext
 
 {-|
@@ -163,5 +163,5 @@ wattsStrogatzGraph'
   :: Int -- ^ n, The number of nodes
   -> Int -- ^ k, the size of the neighborhood / degree (should be even)
   -> Double -- ^ \beta, The probability of a forward edge getting rewritten
-  -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> IO GraphInfo -- ^ The resulting graph
 wattsStrogatzGraph' n k p = runMwcWithSystemRandom (wattsStrogatzGraph n k p)

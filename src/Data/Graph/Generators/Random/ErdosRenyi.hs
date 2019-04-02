@@ -48,7 +48,7 @@ erdosRenyiContext
   -> [Int] -- ^ The algorithm will generate random edges to those nodes
                       --   from or to the given node
   -> Double -- ^ The probability for any pair of nodes to be connected
-  -> Mwc m GraphContext -- ^ The resulting graph (IO required for randomness)
+  -> Mwc m GraphContext -- ^ The resulting graph
 erdosRenyiContext = randomContext
 
 {-|
@@ -76,7 +76,7 @@ erdosRenyiGraph
   :: (PrimMonad m)
   => Int -- ^ The number of nodes
   -> Double -- ^ The probability for any pair of nodes to be connected
-  -> Mwc m GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> Mwc m GraphInfo -- ^ The resulting graph
 erdosRenyiGraph n p = do
   let allNodes            = [0 .. n - 1]
     -- Outgoing edge targets for any node
@@ -102,5 +102,5 @@ erdosRenyiGraph n p = do
 erdosRenyiGraph'
   :: Int -- ^ The number of nodes
   -> Double -- ^ The probability for any pair of nodes to be connected
-  -> IO GraphInfo -- ^ The resulting graph (IO required for randomness)
+  -> IO GraphInfo -- ^ The resulting graph
 erdosRenyiGraph' n p = runMwcWithSystemRandom (erdosRenyiGraph n p)
