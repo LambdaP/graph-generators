@@ -99,19 +99,13 @@ selectNDistinctRandomElements n t@(ms, msSize)
  -}
 selectNDistinctRandomElementsWorker
   :: (PrimMonad m) => Int -> (IntMultiSet, Int) -> IntSet -> Mwc m IntSet
-selectNDistinctRandomElementsWorker 0 _              current = return current
-selectNDistinctRandomElementsWorker n t@(ms, msSize) current = do
+selectNDistinctRandomElementsWorker 0 _ current = return current
+selectNDistinctRandomElementsWorker n t current = do
   randomElement <- selectRandomElement t
   let currentWithRE = IntSet.insert randomElement current
   if randomElement `IntSet.member` current
     then selectNDistinctRandomElementsWorker n t current
     else selectNDistinctRandomElementsWorker (n - 1) t currentWithRE
-
-{-|
- - Internal fold state for the Barabasi generator.
- - TODO: Remove this declaration from global namespace
- -}
-type BarabasiState = (IntMultiSet, [Int], [(Int, Int)])
 
 {-|
  - Generate a random quasi-undirected Barabasi graph.
@@ -132,9 +126,7 @@ barabasiAlbertGraph
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
   -> Mwc m GraphInfo -- ^ The resulting graph (IO required for randomness)
 barabasiAlbertGraph n m = do
-  let nodes     = [0 .. n - 1] -- Nodes [0..m-1]: Initial nodes
-     -- (Our state: repeated nodes, current targets, edges)
-  let initState = (IntMultiSet.empty, [0 .. m - 1], [])
+  let initState = (IntMultiSet.empty, [0 .. m - 1], []) -- (Our state: repeated nodes, current targets, edges)
     -- Strategy: Fold over the list, using a BarabasiState als fold state
   let
     folder st curNode = do

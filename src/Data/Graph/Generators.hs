@@ -20,10 +20,10 @@ module Data.Graph.Generators where
     Copyright (C) 2014 Uli Köhler
     Apache License v2.0
 -}
-data GraphInfo = GraphInfo {
-                  numNodes :: Int, -- ^ Number of nodes
-                  edges :: [(Int,Int)] -- ^ Edge list
-                 } deriving (Eq, Show)
+data GraphInfo = GraphInfo
+  { graphInfoNumNodes :: Int -- ^ Number of nodes
+  , graphInfoEdges    :: [(Int, Int)] -- ^ Edge list
+  } deriving (Eq, Show)
 
 {-|
     The context of a single graph node.
@@ -31,11 +31,11 @@ data GraphInfo = GraphInfo {
     This data-structure is library-agnostic, however,
     it is isomophic to FGL's UContext
 -}
-data GraphContext = GraphContext {
-                        inEdges :: [Int], -- ^ Nodes having an edge to the current node
-                        nodeLabel :: Int, -- ^ The node identifier of the current node
-                        outEdges :: [Int] -- ^ Nodes having an ingoing edge from the current node
-                    }
+data GraphContext = GraphContext
+  { graphContextInEdges   :: [Int] -- ^ Nodes having an edge to the current node
+  , graphContextNodeLabel :: Int -- ^ The node identifier of the current node
+  , graphContextOutEdges  :: [Int] -- ^ Nodes having an ingoing edge from the current node
+  }
 
 {-|
     Check the integrity of a GraphInfo instance:
@@ -44,8 +44,8 @@ data GraphContext = GraphContext {
 -}
 checkGraphInfo :: GraphInfo -> Bool
 checkGraphInfo (GraphInfo n edges) =
-    all (\(i, j) -> 0 <= i && i < n && 0 <= j && j < n) edges
+  all (\(i, j) -> 0 <= i && i < n && 0 <= j && j < n) edges
 
 -- | Get the edge count for a given GraphInfo instance
 numEdges :: GraphInfo -> Int
-numEdges = length . edges
+numEdges = length . graphInfoEdges

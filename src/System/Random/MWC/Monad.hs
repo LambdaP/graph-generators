@@ -7,10 +7,6 @@ module System.Random.MWC.Monad where
 
 import           Control.Monad.Primitive
 import           Control.Monad.Reader
-import           System.Random.MWC              ( Seed
-                                                , fromSeed
-                                                , toSeed
-                                                )
 import qualified System.Random.MWC             as MWC
 
 type Mwc m a = ReaderT (MWC.Gen (PrimState m)) m a
