@@ -122,6 +122,11 @@ wattsStrogatzGraph n k β = do
  - with n nodes
  - where each node has 2*halfK neighbors.
  -
+ - Only half of the edges
+ - are actually encoded:
+ - this simplifies the rewiring process
+ - in wattsStrogatzGraph.
+ -
  - The nodes are labeled 0 through n-1.
  -}
 ringLattice :: Int -> Int -> MapGraph

@@ -51,6 +51,7 @@ Executable TestGen
   other-modules: Data.Graph.Generators,
                  Data.Graph.Generators.Classic,
                  Data.Graph.Generators.Regular,
+                 Data.Graph.Generators.Internal,
                  Data.Graph.Generators.FGL,
                  Data.Graph.Generators.Random.ErdosRenyi,
                  Data.Graph.Generators.Random.WattsStrogatz,

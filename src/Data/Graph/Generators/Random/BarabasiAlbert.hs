@@ -1,4 +1,5 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE TupleSections #-}
 
 {-|
  - Random graph generators using the generator algorithm
@@ -24,6 +25,13 @@ import qualified Data.IntSet                   as IntSet
 import           Data.List                      ( foldl' )
 import           System.Random.MWC.Monad
 
+data SizedIntMultiSet =
+  SizedIntMultiSet Int
+                   IntMultiSet
+
+mkSizedIntMultiSet :: IntMultiSet -> SizedIntMultiSet
+mkSizedIntMultiSet s = SizedIntMultiSet (IntMultiSet.size s) s
+
 {-|
  - Select the nth element
  - from a multiset occur list,
@@ -34,13 +42,13 @@ import           System.Random.MWC.Monad
  - and selecting the nth element.
  -}
 selectNth :: Int -> [(Int, Int)] -> Int
-selectNth n [] =
+selectNth n ((a, c) : xs) | n <= c    = a
+                          | otherwise = selectNth (n - c) xs
+selectNth n _ =
   error
     $  "Can't select nth element - n is greater than list size (n="
     ++ show n
     ++ ", list empty)"
-selectNth n ((a, c) : xs) | n <= c    = a
-                          | otherwise = selectNth (n - c) xs
 
 {-|
  - Select a single random element
@@ -52,11 +60,11 @@ selectNth n ((a, c) : xs) | n <= c    = a
  - not the number of distinct elements
  - in the multiset.
  -}
-selectRandomElement :: (PrimMonad m) => (IntMultiSet, Int) -> Mwc m Int
-selectRandomElement (ms, msSize) = do
+selectRandomElement :: (PrimMonad m) => SizedIntMultiSet -> Mwc m Int
+selectRandomElement (SizedIntMultiSet msSize ms) = do
   let msOccurList = IntMultiSet.toOccurList ms
   r <- uniformR (0, msSize - 1)
-  return $ selectNth r msOccurList
+  return (selectNth r msOccurList)
 
 {-|
  - Select n distinct random elements
@@ -72,14 +80,19 @@ selectRandomElement (ms, msSize) = do
  - for performance reasons.
  -}
 selectNDistinctRandomElements
-  :: (PrimMonad m) => Int -> (IntMultiSet, Int) -> Mwc m [Int]
-selectNDistinctRandomElements n t@(ms, msSize)
+  :: (PrimMonad m) => Int -> SizedIntMultiSet -> Mwc m [Int]
+selectNDistinctRandomElements n t@(SizedIntMultiSet msSize ms)
+  | n < msSize
+  = fmap IntSet.toList (selectNDistinctRandomElementsWorker n t IntSet.empty)
   | n == msSize
-  = return . map fst . IntMultiSet.toOccurList $ ms
-  | msSize < n
-  = error "Can't select n elements from a set with less than n elements"
+  = (return . map fst . IntMultiSet.toOccurList) ms
   | otherwise
-  = IntSet.toList <$> selectNDistinctRandomElementsWorker n t IntSet.empty
+  = error
+    $  "Attempting to select "
+    ++ show n
+    ++ " elements from a multiset of size "
+    ++ show msSize
+    ++ "."
 
 {-|
  - Internal recursive worker for selectNDistinctRandomElements
@@ -95,7 +108,7 @@ selectNDistinctRandomElements n t@(ms, msSize)
  - until the predefined number of elements are set.
  -}
 selectNDistinctRandomElementsWorker
-  :: (PrimMonad m) => Int -> (IntMultiSet, Int) -> IntSet -> Mwc m IntSet
+  :: (PrimMonad m) => Int -> SizedIntMultiSet -> IntSet -> Mwc m IntSet
 selectNDistinctRandomElementsWorker 0 _ current = return current
 selectNDistinctRandomElementsWorker n t current = do
   randomElement <- selectRandomElement t
@@ -123,23 +136,22 @@ barabasiAlbertGraph
   -> Int -- ^ The number of edges to create between a new and existing nodes (m)
   -> Mwc m GraphInfo -- ^ The resulting graph
 barabasiAlbertGraph n m = do
-  let
-    initState = (IntMultiSet.empty, [0 .. m - 1], []) -- (Our state: repeated nodes, current targets, edges)
-  -- Strategy: Fold over the list, using a BarabasiState als fold state
-    folder st curNode = do
-      let (repeatedNodes, targets, edges) = st
-      let newEdges                        = map (\t -> (curNode, t)) targets
-      let newRepeatedNodes =
-            foldl' (flip IntMultiSet.insert) repeatedNodes targets
-      let newRepeatedNodes' = IntMultiSet.insertMany curNode m newRepeatedNodes
-      let repeatedNodesWithSize =
-            (newRepeatedNodes, IntMultiSet.size newRepeatedNodes)
-      newTargets <- selectNDistinctRandomElements m repeatedNodesWithSize
-      return (newRepeatedNodes', newTargets, edges ++ newEdges)
+  let initState = (IntMultiSet.empty, [0 .. m - 1], []) -- (Our state: repeated nodes, current targets, edges)
       -- From the final state, we only require the edge list
   (_, _, allEdges) <- foldM folder initState [m .. n - 1]
-  return $ GraphInfo n allEdges
+  return (GraphInfo n allEdges)
+ where
+  folder (repeatedNodes, targets, edges) curNode = do
+    let newEdges = [ (curNode, j) | j <- targets ]
+        newRepeatedNodes =
+          foldl' (flip IntMultiSet.insert) repeatedNodes targets
+        newRepeatedNodes' = IntMultiSet.insertMany curNode m newRepeatedNodes
+    newTargets <- selectNDistinctRandomElements
+      m
+      (mkSizedIntMultiSet newRepeatedNodes)
+    return (newRepeatedNodes', newTargets, edges ++ newEdges)
 
+-- Strategy: Fold over the list, using a BarabasiState als fold state
 -- Create new edges (for the current node)
 -- Add nodes to the repeated nodes multiset
 -- Select the new target set randomly from the repeated nodes
