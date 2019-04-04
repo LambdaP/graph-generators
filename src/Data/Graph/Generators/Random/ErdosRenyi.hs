@@ -72,7 +72,6 @@ erdosRenyiContext = randomContext
 
 -}
 erdosRenyiGraph
-       -- ^ The random number generator to use
   :: (PrimMonad m)
   => Int -- ^ The number of nodes
   -> Double -- ^ The probability for any pair of nodes to be connected
