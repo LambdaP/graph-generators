@@ -29,6 +29,7 @@ module Data.Graph.Generators.Regular
   , starGraph
   , wheelGraph
   , grid2DGraph
+  , butterflyGraph
   )
 where
 
@@ -216,6 +217,25 @@ wheelGraph n =
           :  [ (0, i) | i <- [1 .. n - 1] ]
           ++ [ (i, i + 1) | i <- [1 .. n - 2] ]
   in  GraphInfo n edges
+
+{-|
+ - Generate the butterfly graph with 2n nodes:
+ - the nodes connecting each half-graph
+ - are nodes 0 and n
+ -}
+butterflyGraph
+  :: Int -- ^ n: Half the size of the graph
+  -> GraphInfo
+butterflyGraph 0 = nullGraph
+butterflyGraph n =
+  GraphInfo (2 * n)
+    $  (0, n)
+    :  (n, 0)
+    :  concat
+         [ [(i, i + 1), (n + i, n + i + 1), (n - 1, i), (2 * n - 1, n + i)]
+         | i <- [0 .. n - 2]
+         ]
+    ++ [ (i, i) | i <- [0 .. 2 * n - 1] ]
 
 {-|
     Generate the 2D grid graph of dimensions m*n

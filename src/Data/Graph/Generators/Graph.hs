@@ -14,4 +14,4 @@ import           Data.Graph                     ( Graph
 import           Data.Graph.Generators          ( GraphInfo(..) )
 
 graphInfoToGraph :: GraphInfo -> Graph
-graphInfoToGraph (GraphInfo n es) = buildG (0, (n - 1)) es
+graphInfoToGraph (GraphInfo n es) = buildG (0, n - 1) es
